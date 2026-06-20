@@ -28,10 +28,12 @@ public class SecurityConfig {
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         // Public endpoints
-                        .requestMatchers("/api/auth/register",
+                        .requestMatchers(
+                                "/api/auth/register",
                                 "/api/auth/login",
-                                "/api/auth/refresh").permitAll()
-                        // Super admin only
+                                "/api/auth/refresh",
+                                "/api/products/**"
+                        ).permitAll()
                         .requestMatchers("/api/auth/admin/create").hasRole("SUPER_ADMIN")
                         // Admin endpoints
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")

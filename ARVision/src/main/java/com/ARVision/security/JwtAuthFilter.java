@@ -2,6 +2,7 @@ package com.ARVision.security;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.ServletOutputStream;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -45,6 +46,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         String role = jwtUtil.extractRole(token);
         String adminRole = jwtUtil.extractAdminRole(token);
 
+
         List<SimpleGrantedAuthority> authorities = new ArrayList<>();
         if (role != null) {
             authorities.add(new SimpleGrantedAuthority("ROLE_" + role));
@@ -56,9 +58,10 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         UsernamePasswordAuthenticationToken auth =
                 new UsernamePasswordAuthenticationToken(
                         email,
-                        token,
+                        adminRole,
                         authorities
                 );
+
 
         SecurityContextHolder.getContext().setAuthentication(auth);
 
