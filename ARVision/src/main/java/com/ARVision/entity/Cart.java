@@ -3,11 +3,12 @@ package com.ARVision.entity;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
-@Data
 @Entity
 @Table(name = "carts")
+@Data
 public class Cart {
 
     @Id
@@ -18,11 +19,15 @@ public class Cart {
     @JoinColumn(name = "customer_id")
     private Customer customer;
 
-    @OneToMany(mappedBy = "cart", cascade = CascadeType.ALL,
-            orphanRemoval = true , fetch = FetchType.EAGER)
-    private List<CartItem> cartItems;
+    @OneToMany(
+            mappedBy = "cart",
+            cascade = CascadeType.ALL,
+            orphanRemoval = true,
+            fetch = FetchType.EAGER   // ← eager load
+    )
+    private List<CartItem> cartItems = new ArrayList<>();  // ← initialize
 
-    private Float totalAmount;
+    private Float totalAmount = 0f;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 

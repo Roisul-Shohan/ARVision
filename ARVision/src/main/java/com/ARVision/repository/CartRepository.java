@@ -24,4 +24,12 @@ public interface CartRepository extends JpaRepository<Cart, Long> {
             @Param("customerId") Long customerId,
             @Param("productId") Long productId
     );
+    @Query("""
+        SELECT DISTINCT c FROM Cart c
+        LEFT JOIN FETCH c.cartItems ci
+        LEFT JOIN FETCH ci.product p
+        LEFT JOIN FETCH p.arModel
+        WHERE c.customer.userId = :customerId
+    """)
+    Optional<Cart> findByCustomerWithItems(@Param("customerId") Long customerId);
 }
