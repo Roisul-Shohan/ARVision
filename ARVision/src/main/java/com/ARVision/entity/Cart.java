@@ -18,7 +18,8 @@ public class Cart {
     @JoinColumn(name = "customer_id")
     private Customer customer;
 
-    @OneToMany(mappedBy = "cart", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "cart", cascade = CascadeType.ALL,
+            orphanRemoval = true , fetch = FetchType.EAGER)
     private List<CartItem> cartItems;
 
     private Float totalAmount;

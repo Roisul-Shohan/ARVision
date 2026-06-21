@@ -16,9 +16,11 @@ public class Customer extends User {
     private LocalDate memberSince;
     private String shippingAddress;
 
-    @OneToOne(mappedBy = "customer", cascade = CascadeType.ALL)
+    @OneToOne(mappedBy = "customer", cascade = CascadeType.ALL,
+            fetch = FetchType.EAGER)
     private Cart cart;
 
-    @OneToMany(mappedBy = "customer", cascade = CascadeType.ALL)
+    @OneToMany(mappedBy = "customer", cascade = CascadeType.ALL,
+            fetch = FetchType.EAGER)
     private List<Order> orders;
 }
