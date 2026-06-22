@@ -41,8 +41,7 @@ public class Order {
         this.orderDate = LocalDateTime.now();
         this.status = OrderStatus.PENDING;
     }
-
     public enum OrderStatus {
-        PENDING, SHIPPED, DELIVERED, CANCELLED
+        PENDING, SHIPPED, DELIVERED, CANCELLED,PROCESSING
     }
 }

@@ -17,14 +17,25 @@ public class Payment {
     @JoinColumn(name = "order_id")
     private Order order;
 
-    private String method;
+    private String method;                    // STRIPE, CASH_ON_DELIVERY
+
     private Float amount;
-    private String transactionId;
+
+    private String stripePaymentIntentId;     // stripe's payment intent ID
+
+    private String transactionId;             // stripe charge ID after success
+
+    private String receiptUrl;                // stripe hosted receipt URL
 
     @Enumerated(EnumType.STRING)
     private PaymentStatus status;
 
     private String contactNumber;
+
+    private String refundReason;
+
+    private String stripeRefundId;            // stripe refund ID if refunded
+
     private LocalDateTime paymentDate;
 
     @PrePersist
@@ -34,6 +45,10 @@ public class Payment {
     }
 
     public enum PaymentStatus {
-        PENDING, COMPLETED, FAILED, REFUNDED
+        PENDING,
+        COMPLETED,
+        FAILED,
+        REFUND_REQUESTED,
+        REFUNDED
     }
 }

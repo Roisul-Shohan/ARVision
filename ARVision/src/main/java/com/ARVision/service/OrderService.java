@@ -59,8 +59,10 @@ public class OrderService {
                         .build())
                 .toList();
 
-        // Can only cancel if status is PENDING
-        boolean canCancel = order.getStatus() == Order.OrderStatus.PENDING;
+        // Can only cancel if status is PENDING and not paid
+        boolean canCancel = order.getStatus() == Order.OrderStatus.PENDING
+                && (order.getPayment() == null
+                || order.getPayment().getStatus() != Payment.PaymentStatus.COMPLETED);
 
         return OrderResponse.builder()
                 .orderId(order.getOrderId())
@@ -295,6 +297,12 @@ public class OrderService {
                             order.getStatus().name().toLowerCase()
             );
         }
+
+                // Paid orders can no longer be canceled through the customer flow
+                if (order.getPayment() != null
+                                && order.getPayment().getStatus() == Payment.PaymentStatus.COMPLETED) {
+                        throw new RuntimeException("Cannot cancel a paid order");
+                }
 
         if (order.getStatus() == Order.OrderStatus.CANCELLED) {
             throw new RuntimeException("Order is already cancelled");
