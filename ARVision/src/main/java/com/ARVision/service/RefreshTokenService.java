@@ -2,6 +2,8 @@ package com.ARVision.service;
 
 import com.ARVision.entity.RefreshToken;
 import com.ARVision.entity.User;
+import com.ARVision.exception.BadRequestException;
+import com.ARVision.exception.ResourceNotFoundException;
 import com.ARVision.repository.RefreshTokenRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -45,15 +47,15 @@ public class RefreshTokenService {
     @Transactional
     public RefreshToken validateRefreshToken(String token) {
         RefreshToken refreshToken = refreshTokenRepository.findByToken(token)
-                .orElseThrow(() -> new RuntimeException("Refresh token not found"));
+                 .orElseThrow(() -> new ResourceNotFoundException("Refresh token not found"));
 
         if (refreshToken.isRevoked()) {
-            throw new RuntimeException("Refresh token has been revoked");
+              throw new BadRequestException("Refresh token has been revoked");
         }
 
         if (refreshToken.getExpiryDate().isBefore(Instant.now())) {
             refreshTokenRepository.delete(refreshToken);
-            throw new RuntimeException("Refresh token expired. Please login again.");
+              throw new BadRequestException("Refresh token expired. Please login again.");
         }
 
         return refreshToken;

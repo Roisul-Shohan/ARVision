@@ -3,6 +3,8 @@ package com.ARVision.service;
 import com.ARVision.dto.armodel.ARModelResponse;
 import com.ARVision.entity.ARModel;
 import com.ARVision.entity.Product;
+import com.ARVision.exception.BadRequestException;
+import com.ARVision.exception.ResourceNotFoundException;
 import com.ARVision.repository.ARModelRepository;
 import com.ARVision.repository.ProductRepository;
 import com.cloudinary.Cloudinary;
@@ -44,12 +46,12 @@ public class ARModelService {
 
         // Validate product exists
         Product product = productRepository.findById(productId)
-                .orElseThrow(() -> new RuntimeException("Product not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Product", productId));
 
         // Validate file type — only GLB and USDZ allowed
         String originalFilename = file.getOriginalFilename();
         if (originalFilename == null) {
-            throw new RuntimeException("Invalid file");
+                        throw new BadRequestException("Invalid file");
         }
 
         String extension = originalFilename
@@ -57,13 +59,13 @@ public class ARModelService {
                 .toLowerCase();
 
         if (!extension.equals("glb") && !extension.equals("usdz")) {
-            throw new RuntimeException("Only GLB and USDZ files are allowed for AR models");
+                        throw new BadRequestException("Only GLB and USDZ files are allowed for AR models");
         }
 
         // Validate file size — max 50MB
         float fileSizeMB = (float) file.getSize() / (1024 * 1024);
         if (fileSizeMB > 50) {
-            throw new RuntimeException("File size exceeds 50MB limit");
+                        throw new BadRequestException("File size exceeds 50MB limit");
         }
 
         // If product already has AR model → delete old one from cloudinary first
@@ -107,7 +109,7 @@ public class ARModelService {
     // ── Get AR model by product ID ─────────────────────────────
     public ARModelResponse getARModelByProductId(Long productId) {
         ARModel model = arModelRepository.findByProductProductId(productId)
-                .orElseThrow(() -> new RuntimeException("No AR model found for this product"));
+                .orElseThrow(() -> new ResourceNotFoundException("No AR model found for this product"));
         return toResponse(model);
     }
 
@@ -123,7 +125,7 @@ public class ARModelService {
     @Transactional
     public void deleteARModel(Long productId) throws IOException {
         ARModel model = arModelRepository.findByProductProductId(productId)
-                .orElseThrow(() -> new RuntimeException("No AR model found for this product"));
+                .orElseThrow(() -> new ResourceNotFoundException("No AR model found for this product"));
 
         // Delete from Cloudinary
         cloudinary.uploader().destroy(

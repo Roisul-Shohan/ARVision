@@ -3,6 +3,8 @@ package com.ARVision.service;
 import com.ARVision.dto.product.ProductRequest;
 import com.ARVision.dto.product.ProductResponse;
 import com.ARVision.entity.Product;
+import com.ARVision.exception.BadRequestException;
+import com.ARVision.exception.ResourceNotFoundException;
 import com.ARVision.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.*;
@@ -46,7 +48,7 @@ public class ProductService {
     // ── PUBLIC: Get single product ─────────────────────────────
     public ProductResponse getProductById(Long id) {
         Product product = productRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Product not found"));
+                    .orElseThrow(() -> new ResourceNotFoundException("Product", id));
         return toResponse(product);
     }
 
@@ -103,7 +105,7 @@ public class ProductService {
     @Transactional
     public ProductResponse updateProduct(Long id, ProductRequest request) {
         Product product = productRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Product not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Product", id));
 
         product.setName(request.getName());
         product.setDescription(request.getDescription());
@@ -119,7 +121,7 @@ public class ProductService {
     @Transactional
     public void deleteProduct(Long id) {
         if (!productRepository.existsById(id)) {
-            throw new RuntimeException("Product not found");
+            throw new ResourceNotFoundException("Product", id);
         }
         productRepository.deleteById(id);
     }
@@ -128,10 +130,10 @@ public class ProductService {
     @Transactional
     public ProductResponse updateStock(Long id, Integer quantity) {
         Product product = productRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Product not found"));
+                 .orElseThrow(() -> new ResourceNotFoundException("Product not found"));
 
         if (quantity < 0) {
-            throw new RuntimeException("Stock cannot be negative");
+              throw new BadRequestException("Stock cannot be negative");
         }
 
         product.setStockQuantity(quantity);

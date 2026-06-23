@@ -1,5 +1,6 @@
 package com.ARVision.controller;
 
+import com.ARVision.dto.common.ApiResponse;
 import com.ARVision.dto.payment.PaymentResponse;
 import com.ARVision.entity.Payment;
 import com.ARVision.service.PaymentService;
@@ -21,18 +22,21 @@ public class AdminPaymentController {
 
     // GET /api/admin/payments?status=PENDING&page=0&size=20
     @GetMapping
-    public ResponseEntity<Page<PaymentResponse>> getAllPayments(
+    public ResponseEntity<ApiResponse<Page<PaymentResponse>>> getAllPayments(
             @RequestParam(required = false) Payment.PaymentStatus status,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 
-        return ResponseEntity.ok(
-                paymentService.getAllPayments(status, page, size));
+        return ResponseEntity.ok(ApiResponse.success(
+                paymentService.getAllPayments(status, page, size),
+                "Payments fetched successfully"));
     }
 
     // GET /api/admin/payments/stats
     @GetMapping("/stats")
-    public ResponseEntity<Map<String, Object>> getStats() {
-        return ResponseEntity.ok(paymentService.getPaymentStats());
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getStats() {
+        return ResponseEntity.ok(ApiResponse.success(
+                paymentService.getPaymentStats(),
+                "Payment stats fetched successfully"));
     }
 }

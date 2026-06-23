@@ -1,6 +1,7 @@
 package com.ARVision.controller;
 
 import com.ARVision.dto.order.*;
+import com.ARVision.dto.common.ApiResponse;
 import com.ARVision.entity.Order;
 import com.ARVision.service.OrderService;
 import jakarta.validation.Valid;
@@ -22,54 +23,66 @@ public class OrderController {
     // Check saved address before ordering
     // GET /api/customer/orders/check-address
     @GetMapping("/check-address")
-    public ResponseEntity<AddressCheckResponse> checkAddress(
+    public ResponseEntity<ApiResponse<AddressCheckResponse>> checkAddress(
             @AuthenticationPrincipal String email) {
-        return ResponseEntity.ok(orderService.checkAddress(email));
+        return ResponseEntity.ok(ApiResponse.success(
+                orderService.checkAddress(email),
+                "Address check completed"));
     }
 
     // Place order from cart
     // POST /api/customer/orders/from-cart
     @PostMapping("/from-cart")
-    public ResponseEntity<OrderResponse> placeOrderFromCart(
+    public ResponseEntity<ApiResponse<OrderResponse>> placeOrderFromCart(
             @AuthenticationPrincipal String email,
             @RequestBody PlaceOrderRequest request) {
-        return ResponseEntity.ok(orderService.placeOrderFromCart(email, request));
+        return ResponseEntity.ok(ApiResponse.success(
+                orderService.placeOrderFromCart(email, request),
+                "Order placed successfully"));
     }
 
     // Place direct order (without cart)
     // POST /api/customer/orders/direct
     @PostMapping("/direct")
-    public ResponseEntity<OrderResponse> placeDirectOrder(
+    public ResponseEntity<ApiResponse<OrderResponse>> placeDirectOrder(
             @AuthenticationPrincipal String email,
             @Valid @RequestBody DirectOrderRequest request) {
-        return ResponseEntity.ok(orderService.placeDirectOrder(email, request));
+        return ResponseEntity.ok(ApiResponse.success(
+                orderService.placeDirectOrder(email, request),
+                "Order placed successfully"));
     }
 
     // Get my orders
     // GET /api/customer/orders?page=0&size=10
     @GetMapping
-    public ResponseEntity<Page<OrderResponse>> getMyOrders(
+    public ResponseEntity<ApiResponse<Page<OrderResponse>>> getMyOrders(
             @AuthenticationPrincipal String email,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
-        return ResponseEntity.ok(orderService.getMyOrders(email, page, size));
+        return ResponseEntity.ok(ApiResponse.success(
+                orderService.getMyOrders(email, page, size),
+                "Orders fetched successfully"));
     }
 
     // Get single order
     // GET /api/customer/orders/5
     @GetMapping("/{orderId}")
-    public ResponseEntity<OrderResponse> getOrder(
+    public ResponseEntity<ApiResponse<OrderResponse>> getOrder(
             @AuthenticationPrincipal String email,
             @PathVariable Long orderId) {
-        return ResponseEntity.ok(orderService.getOrderById(email, orderId));
+        return ResponseEntity.ok(ApiResponse.success(
+                orderService.getOrderById(email, orderId),
+                "Order fetched successfully"));
     }
 
     // Cancel order
     // DELETE /api/customer/orders/5/cancel
     @DeleteMapping("/{orderId}/cancel")
-    public ResponseEntity<OrderResponse> cancelOrder(
+    public ResponseEntity<ApiResponse<OrderResponse>> cancelOrder(
             @AuthenticationPrincipal String email,
             @PathVariable Long orderId) {
-        return ResponseEntity.ok(orderService.cancelOrder(email, orderId));
+        return ResponseEntity.ok(ApiResponse.success(
+                orderService.cancelOrder(email, orderId),
+                "Order cancelled successfully"));
     }
 }

@@ -4,6 +4,9 @@ import com.ARVision.dto.cart.AddToCartRequest;
 import com.ARVision.dto.cart.CartResponse;
 import com.ARVision.dto.cart.UpdateCartItemRequest;
 import com.ARVision.entity.*;
+import com.ARVision.exception.BadRequestException;
+import com.ARVision.exception.ResourceNotFoundException;
+import com.ARVision.exception.UnauthorizedException;
 import com.ARVision.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -24,9 +27,9 @@ public class CartService {
     // ── Get customer from email ────────────────────────────────
     private Customer getCustomer(String email) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                    .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         return customerRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Customer not found"));
+                    .orElseThrow(() -> new ResourceNotFoundException("Customer not found"));
     }
 
     // ── Get or create cart for customer ───────────────────────
@@ -98,11 +101,11 @@ public class CartService {
         Customer customer = getCustomer(email);
 
         Product product = productRepository.findById(request.getProductId())
-                .orElseThrow(() -> new RuntimeException("Product not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Product", request.getProductId()));
 
         // Check stock availability
         if (product.getStockQuantity() < request.getQuantity()) {
-            throw new RuntimeException(
+            throw new BadRequestException(
                     "Only " + product.getStockQuantity() + " items available in stock"
             );
         }
@@ -122,7 +125,7 @@ public class CartService {
 
             // Check new total doesn't exceed stock
             if (newQuantity > product.getStockQuantity()) {
-                throw new RuntimeException(
+                throw new BadRequestException(
                         "Cannot add more. Only "
                                 + product.getStockQuantity()
                                 + " items available in stock"
@@ -160,11 +163,11 @@ public class CartService {
         Cart cart = getOrCreateCart(customer);
 
         CartItem cartItem = cartItemRepository.findById(cartItemId)
-                .orElseThrow(() -> new RuntimeException("Cart item not found"));
+            .orElseThrow(() -> new ResourceNotFoundException("Cart item not found"));
 
         // Security check — make sure item belongs to this customer's cart
         if (!cartItem.getCart().getCartId().equals(cart.getCartId())) {
-            throw new RuntimeException("Unauthorized access to cart item");
+            throw new UnauthorizedException("Unauthorized access to cart item");
         }
 
         // If quantity = 0 → remove item
@@ -174,7 +177,7 @@ public class CartService {
         } else {
             // Check stock
             if (request.getQuantity() > cartItem.getProduct().getStockQuantity()) {
-                throw new RuntimeException(
+                throw new BadRequestException(
                         "Only " + cartItem.getProduct().getStockQuantity()
                                 + " items available in stock"
                 );
@@ -198,11 +201,11 @@ public class CartService {
         Cart cart = getOrCreateCart(customer);
 
         CartItem cartItem = cartItemRepository.findById(cartItemId)
-                .orElseThrow(() -> new RuntimeException("Cart item not found"));
+            .orElseThrow(() -> new ResourceNotFoundException("Cart item not found"));
 
         // Security check
         if (!cartItem.getCart().getCartId().equals(cart.getCartId())) {
-            throw new RuntimeException("Unauthorized access to cart item");
+            throw new UnauthorizedException("Unauthorized access to cart item");
         }
 
         cart.getCartItems().remove(cartItem);

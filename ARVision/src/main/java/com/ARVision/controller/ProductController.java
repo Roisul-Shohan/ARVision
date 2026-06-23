@@ -1,5 +1,6 @@
 package com.ARVision.controller;
 
+import com.ARVision.dto.common.ApiResponse;
 import com.ARVision.dto.product.ProductResponse;
 import com.ARVision.service.ProductService;
 import lombok.RequiredArgsConstructor;
@@ -19,38 +20,43 @@ public class ProductController {
     // Home page — all products with pagination and sorting
     // GET /api/products?page=0&size=12&sortBy=createdAt&sortDir=desc
     @GetMapping
-    public ResponseEntity<Page<ProductResponse>> getAllProducts(
+    public ResponseEntity<ApiResponse<Page<ProductResponse>>> getAllProducts(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "12") int size,
             @RequestParam(defaultValue = "createdAt") String sortBy,
             @RequestParam(defaultValue = "desc") String sortDir) {
 
-        return ResponseEntity.ok(
-                productService.getAllProducts(page, size, sortBy, sortDir));
+        return ResponseEntity.ok(ApiResponse.success(
+                productService.getAllProducts(page, size, sortBy, sortDir),
+                "Products fetched successfully"));
     }
 
     // Single product detail page
     // GET /api/products/5
     @GetMapping("/{id}")
-    public ResponseEntity<ProductResponse> getProductById(@PathVariable Long id) {
-        return ResponseEntity.ok(productService.getProductById(id));
+    public ResponseEntity<ApiResponse<ProductResponse>> getProductById(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success(
+                productService.getProductById(id),
+                "Product fetched successfully"));
     }
 
     // Real-time search — frontend calls this on EVERY keystroke
     // GET /api/products/search?keyword=chair&page=0&size=12
     @GetMapping("/search")
-    public ResponseEntity<Page<ProductResponse>> search(
+    public ResponseEntity<ApiResponse<Page<ProductResponse>>> search(
             @RequestParam(required = false) String keyword,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "12") int size) {
 
-        return ResponseEntity.ok(productService.search(keyword, page, size));
+        return ResponseEntity.ok(ApiResponse.success(
+                productService.search(keyword, page, size),
+                "Search results fetched"));
     }
 
     // Advanced filter — keyword + category + price range
     // GET /api/products/filter?keyword=sofa&category=furniture&minPrice=100&maxPrice=500
     @GetMapping("/filter")
-    public ResponseEntity<Page<ProductResponse>> filterProducts(
+    public ResponseEntity<ApiResponse<Page<ProductResponse>>> filterProducts(
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String category,
             @RequestParam(required = false) Float minPrice,
@@ -60,14 +66,18 @@ public class ProductController {
             @RequestParam(defaultValue = "price") String sortBy,
             @RequestParam(defaultValue = "asc") String sortDir) {
 
-        return ResponseEntity.ok(productService.filterProducts(
-                keyword, category, minPrice, maxPrice, page, size, sortBy, sortDir));
+        return ResponseEntity.ok(ApiResponse.success(
+            productService.filterProducts(
+                keyword, category, minPrice, maxPrice, page, size, sortBy, sortDir),
+            "Products filtered successfully"));
     }
 
     // All categories for filter dropdown
     // GET /api/products/categories
     @GetMapping("/categories")
-    public ResponseEntity<List<String>> getCategories() {
-        return ResponseEntity.ok(productService.getAllCategories());
+    public ResponseEntity<ApiResponse<List<String>>> getCategories() {
+        return ResponseEntity.ok(ApiResponse.success(
+                productService.getAllCategories(),
+                "Categories fetched successfully"));
     }
 }

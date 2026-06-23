@@ -2,6 +2,9 @@ package com.ARVision.service;
 
 import com.ARVision.dto.auth.*;
 import com.ARVision.entity.*;
+import com.ARVision.exception.BadRequestException;
+import com.ARVision.exception.ResourceNotFoundException;
+import com.ARVision.exception.UnauthorizedException;
 import com.ARVision.repository.*;
 import com.ARVision.security.JwtUtil;
 import lombok.RequiredArgsConstructor;
@@ -26,7 +29,7 @@ public class AuthService {
     @Transactional
     public AuthResult registerCustomer(RegisterRequest request) {
         if (userRepository.existsByEmail(request.getEmail())) {
-            throw new RuntimeException("Email already registered");
+            throw new BadRequestException("Email already registered");
         }
 
         Customer customer = new Customer();
@@ -54,26 +57,26 @@ public class AuthService {
 
     public AuthResult login(LoginRequest request) {
         User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new RuntimeException("Invalid email or password"));
+            .orElseThrow(() -> new UnauthorizedException("Invalid email or password"));
 
         // ── Password check depends on who is logging in ────────────
         if (user.getRole() == User.Role.ADMIN) {
             // Admin password is hardcoded — just compare plain text
             if (!"123456".equals(request.getPassword())) {
-                throw new RuntimeException("Invalid email or password");
+                throw new UnauthorizedException("Invalid email or password");
             }
         } else {
             // Customer password is bcrypt hashed
             if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-                throw new RuntimeException("Invalid email or password");
+                throw new UnauthorizedException("Invalid email or password");
             }
         }
 
         // ── Build response based on role ───────────────────────────
         if (user.getRole() == User.Role.ADMIN) {
 
-            Admin admin = adminRepository.findByEmail(user.getEmail())
-                    .orElseThrow(() -> new RuntimeException("Admin record not found"));
+Admin admin = adminRepository.findByEmail(user.getEmail())
+                .orElseThrow(() -> new ResourceNotFoundException("Admin", null));
 
             // Generate token with adminRole claim inside
             String accessToken = jwtUtil.generateAccessToken(
@@ -121,7 +124,7 @@ public class AuthService {
 
         if (user.getRole() == User.Role.ADMIN) {
             Admin admin = adminRepository.findByEmail(user.getEmail())
-                    .orElseThrow(() -> new RuntimeException("Admin record not found"));
+                    .orElseThrow(() -> new ResourceNotFoundException("Admin", null));
 
             String newAccessToken = jwtUtil.generateAccessToken(
                     user.getEmail(),
@@ -164,14 +167,14 @@ public class AuthService {
     public AuthResponse createAdmin(CreateAdminRequest request, String requesterEmail) {
         // Verify requester is SUPER_ADMIN
         Admin requester = adminRepository.findByEmail(requesterEmail)
-                .orElseThrow(() -> new RuntimeException("Requester not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Requester not found"));
 
         if (requester.getAdminrole() != Admin.AdminRole.SUPER_ADMIN) {
-            throw new RuntimeException("Only SUPER_ADMIN can create new admins");
+            throw new UnauthorizedException("Only SUPER_ADMIN can create new admins");
         }
 
         if (userRepository.existsByEmail(request.getEmail())) {
-            throw new RuntimeException("Email already registered");
+            throw new BadRequestException("Email already registered");
         }
 
         Admin admin = new Admin();
@@ -199,7 +202,7 @@ public class AuthService {
     @Transactional
     public void logout(String email) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         refreshTokenService.revokeToken(user);
     }
 

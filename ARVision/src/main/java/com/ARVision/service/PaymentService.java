@@ -6,6 +6,10 @@ import com.ARVision.dto.payment.RefundRequest;
 import com.ARVision.entity.Customer;
 import com.ARVision.entity.Order;
 import com.ARVision.entity.Payment;
+import com.ARVision.exception.BadRequestException;
+import com.ARVision.exception.PaymentException;
+import com.ARVision.exception.ResourceNotFoundException;
+import com.ARVision.exception.UnauthorizedException;
 import com.ARVision.repository.CustomerRepository;
 import com.ARVision.repository.OrderRepository;
 import com.ARVision.repository.PaymentRepository;
@@ -52,10 +56,10 @@ public class PaymentService {
         @Value("${stripe.webhook-secret}")
         private String webhookSecret;
 
-        private Customer getCustomer(String email) {
-                return customerRepository.findByEmail(email)
-                                .orElseThrow(() -> new RuntimeException("Customer not found"));
-        }
+private Customer getCustomer(String email) {
+        return customerRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("Customer", null));
+    }
 
         private PaymentResponse toResponse(Payment payment) {
                 boolean refundable = payment.getStatus() == Payment.PaymentStatus.COMPLETED
@@ -77,28 +81,28 @@ public class PaymentService {
                                 .build();
         }
 
-        @Transactional
+@Transactional
         public PaymentIntentResponse createPaymentIntent(String email, Long orderId)
                         throws StripeException {
 
-                Customer customer = getCustomer(email);
+            Customer customer = getCustomer(email);
 
-                Order order = orderRepository.findByIdWithItems(orderId)
-                                .orElseThrow(() -> new RuntimeException("Order not found"));
+            Order order = orderRepository.findByIdWithItems(orderId)
+                        .orElseThrow(() -> new ResourceNotFoundException("Order", orderId));
 
-                if (!order.getCustomer().getUserId().equals(customer.getUserId())) {
-                        throw new RuntimeException("Unauthorized to pay this order");
-                }
+            if (!order.getCustomer().getUserId().equals(customer.getUserId())) {
+                        throw new UnauthorizedException("Unauthorized to pay this order");
+            }
 
-                if (order.getStatus() == Order.OrderStatus.CANCELLED) {
-                        throw new RuntimeException("Cannot pay for a cancelled order");
-                }
+            if (order.getStatus() == Order.OrderStatus.CANCELLED) {
+                        throw new BadRequestException("Cannot pay for a cancelled order");
+            }
 
-                paymentRepository.findByOrderOrderId(orderId).ifPresent(p -> {
+            paymentRepository.findByOrderOrderId(orderId).ifPresent(p -> {
                         if (p.getStatus() == Payment.PaymentStatus.COMPLETED) {
-                                throw new RuntimeException("Order is already paid");
+                                throw new BadRequestException("Order is already paid");
                         }
-                });
+            });
 
                 long amountInCents = (long) (order.getTotalAmount() * 100);
 
@@ -244,55 +248,53 @@ public class PaymentService {
                                 });
         }
 
-        @Transactional
+@Transactional
         public PaymentResponse getReceipt(String email, Long orderId) {
                 Customer customer = getCustomer(email);
 
                 Order order = orderRepository.findById(orderId)
-                                .orElseThrow(() -> new RuntimeException("Order not found"));
+                        .orElseThrow(() -> new ResourceNotFoundException("Order", orderId));
 
                 if (!order.getCustomer().getUserId().equals(customer.getUserId())) {
-                        throw new RuntimeException("Unauthorized");
+                        throw new UnauthorizedException("Unauthorized to view this receipt");
                 }
 
                 Payment payment = paymentRepository.findByOrderOrderId(orderId)
-                                .orElseThrow(() -> new RuntimeException("No payment found for this order"));
+                        .orElseThrow(() -> new ResourceNotFoundException("Payment", orderId));
 
                 return toResponse(payment);
         }
 
-        @Transactional
+@Transactional
         public PaymentResponse requestRefund(String email, Long orderId, RefundRequest request)
                         throws StripeException {
 
                 Customer customer = getCustomer(email);
 
                 Payment payment = paymentRepository.findByOrderOrderId(orderId)
-                                .orElseThrow(() -> new RuntimeException("No payment found for this order"));
+                        .orElseThrow(() -> new ResourceNotFoundException("Payment", orderId));
 
                 if (!payment.getOrder().getCustomer().getUserId().equals(customer.getUserId())) {
-                        throw new RuntimeException("Unauthorized");
+                        throw new UnauthorizedException("Unauthorized to refund this order");
                 }
 
                 if (payment.getStatus() != Payment.PaymentStatus.COMPLETED) {
-                        throw new RuntimeException("Only completed payments can be refunded");
+                        throw new BadRequestException("Only completed payments can be refunded");
                 }
 
                 Order.OrderStatus orderStatus = payment.getOrder().getStatus();
                 if (orderStatus == Order.OrderStatus.SHIPPED || orderStatus == Order.OrderStatus.DELIVERED) {
-                        throw new RuntimeException("Cannot refund order that has been "
-                                        + orderStatus.name().toLowerCase());
+                        throw new BadRequestException("Cannot refund order that has been " + orderStatus.name().toLowerCase());
                 }
 
                 String chargeId = payment.getTransactionId();
                 if (chargeId == null || chargeId.isBlank()) {
                         PaymentIntent stripePaymentIntent = PaymentIntent.retrieve(
-                                        payment.getStripePaymentIntentId());
+                                payment.getStripePaymentIntentId());
                         chargeId = stripePaymentIntent.getLatestCharge();
 
                         if (chargeId == null || chargeId.isBlank()) {
-                                throw new RuntimeException(
-                                                "This payment has not been successfully charged yet, so it cannot be refunded");
+                                throw new PaymentException("This payment has not been successfully charged yet, so it cannot be refunded");
                         }
 
                         payment.setTransactionId(chargeId);
@@ -301,9 +303,9 @@ public class PaymentService {
 
                 try {
                         RefundCreateParams params = RefundCreateParams.builder()
-                                        .setCharge(chargeId)
-                                        .setReason(RefundCreateParams.Reason.REQUESTED_BY_CUSTOMER)
-                                        .build();
+                                .setCharge(chargeId)
+                                .setReason(RefundCreateParams.Reason.REQUESTED_BY_CUSTOMER)
+                                .build();
 
                         Refund refund = Refund.create(params);
 
@@ -320,7 +322,7 @@ public class PaymentService {
                                 System.out.println("Stripe charge not found for refund; applying local fallback refund for testing.");
                                 simulateRefund(payment, request.getReason());
                         } else {
-                                throw e;
+                                throw new PaymentException("Refund processing failed: " + e.getMessage());
                         }
                 }
 

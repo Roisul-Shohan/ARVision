@@ -1,6 +1,7 @@
 package com.ARVision.controller;
 
 import com.ARVision.dto.payment.*;
+import com.ARVision.dto.common.ApiResponse;
 import com.ARVision.service.PaymentService;
 import com.stripe.exception.StripeException;
 import lombok.RequiredArgsConstructor;
@@ -20,33 +21,37 @@ public class PaymentController {
     // Create payment intent — frontend uses clientSecret to show Stripe form
     // POST /api/customer/payments/1/create-intent
     @PostMapping("/{orderId}/create-intent")
-    public ResponseEntity<PaymentIntentResponse> createPaymentIntent(
+    public ResponseEntity<ApiResponse<PaymentIntentResponse>> createPaymentIntent(
             @AuthenticationPrincipal String email,
             @PathVariable Long orderId) throws StripeException {
 
-        return ResponseEntity.ok(
-                paymentService.createPaymentIntent(email, orderId));
+        return ResponseEntity.ok(ApiResponse.success(
+                paymentService.createPaymentIntent(email, orderId),
+                "Payment intent created successfully"));
     }
 
     // Get payment receipt
     // GET /api/customer/payments/1/receipt
     @GetMapping("/{orderId}/receipt")
-    public ResponseEntity<PaymentResponse> getReceipt(
+    public ResponseEntity<ApiResponse<PaymentResponse>> getReceipt(
             @AuthenticationPrincipal String email,
             @PathVariable Long orderId) {
 
-        return ResponseEntity.ok(paymentService.getReceipt(email, orderId));
+        return ResponseEntity.ok(ApiResponse.success(
+                paymentService.getReceipt(email, orderId),
+                "Receipt fetched successfully"));
     }
 
     // Request refund
     // POST /api/customer/payments/1/refund
     @PostMapping("/{orderId}/refund")
-    public ResponseEntity<PaymentResponse> requestRefund(
+    public ResponseEntity<ApiResponse<PaymentResponse>> requestRefund(
             @AuthenticationPrincipal String email,
             @PathVariable Long orderId,
             @RequestBody RefundRequest request) throws StripeException {
 
-        return ResponseEntity.ok(
-                paymentService.requestRefund(email, orderId, request));
+        return ResponseEntity.ok(ApiResponse.success(
+                paymentService.requestRefund(email, orderId, request),
+                "Refund processed successfully"));
     }
 }

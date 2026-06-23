@@ -1,8 +1,8 @@
 package com.ARVision.security;
 
+import com.ARVision.exception.UnauthorizedException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
-import jakarta.servlet.ServletOutputStream;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -38,8 +38,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         String token = authHeader.substring(7);
 
         if (!jwtUtil.isTokenValid(token)) {
-            filterChain.doFilter(request, response);
-            return;
+            throw new UnauthorizedException("Token is expired or invalid");
         }
 
 

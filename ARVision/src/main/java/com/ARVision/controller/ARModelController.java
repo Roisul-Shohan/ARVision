@@ -1,6 +1,7 @@
 package com.ARVision.controller;
 
 import com.ARVision.dto.armodel.ARModelResponse;
+import com.ARVision.dto.common.ApiResponse;
 import com.ARVision.service.ARModelService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
@@ -22,9 +23,11 @@ public class ARModelController {
     // ── PUBLIC: Get AR model for a product (frontend AR viewer) ──
     // GET /api/products/5/ar-model
     @GetMapping("/products/{productId}/ar-model")
-    public ResponseEntity<ARModelResponse> getARModel(@PathVariable Long productId) {
+    public ResponseEntity<ApiResponse<ARModelResponse>> getARModel(@PathVariable Long productId) {
 
-        return ResponseEntity.ok(arModelService.getARModelByProductId(productId));
+        return ResponseEntity.ok(ApiResponse.success(
+                arModelService.getARModelByProductId(productId),
+                "AR model fetched successfully"));
     }
 
     // ── ADMIN: Upload AR model for a product ───────────────────
@@ -34,27 +37,32 @@ public class ARModelController {
             consumes = MediaType.MULTIPART_FORM_DATA_VALUE
     )
     @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('PRODUCT_MANAGER')")
-    public ResponseEntity<ARModelResponse> uploadARModel(
+    public ResponseEntity<ApiResponse<ARModelResponse>> uploadARModel(
             @PathVariable Long productId,
             @RequestParam("file") MultipartFile file) throws IOException {
         System.out.println("jfj");
-        return ResponseEntity.ok(arModelService.uploadARModel(productId, file));
+        return ResponseEntity.ok(ApiResponse.success(
+                arModelService.uploadARModel(productId, file),
+                "AR model uploaded successfully"));
     }
 
     // ── ADMIN: Get all AR models ───────────────────────────────
     // GET /api/admin/ar-models
     @GetMapping("/admin/ar-models")
     @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('PRODUCT_MANAGER')")
-    public ResponseEntity<List<ARModelResponse>> getAllARModels() {
-        return ResponseEntity.ok(arModelService.getAllARModels());
+    public ResponseEntity<ApiResponse<List<ARModelResponse>>> getAllARModels() {
+        return ResponseEntity.ok(ApiResponse.success(
+                arModelService.getAllARModels(),
+                "AR models fetched successfully"));
     }
 
     // ── ADMIN: Delete AR model ─────────────────────────────────
     // DELETE /api/admin/products/5/ar-model
     @DeleteMapping("/admin/products/{productId}/ar-model")
     @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('PRODUCT_MANAGER')")
-    public ResponseEntity<String> deleteARModel(@PathVariable Long productId) throws IOException {
+    public ResponseEntity<ApiResponse<Void>> deleteARModel(@PathVariable Long productId) throws IOException {
         arModelService.deleteARModel(productId);
-        return ResponseEntity.ok("AR model deleted successfully");
+        return ResponseEntity.ok(ApiResponse.success(null,
+                "AR model deleted successfully"));
     }
 }

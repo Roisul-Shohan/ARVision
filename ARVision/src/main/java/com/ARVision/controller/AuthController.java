@@ -1,6 +1,7 @@
 package com.ARVision.controller;
 
 import com.ARVision.dto.auth.*;
+import com.ARVision.dto.common.ApiResponse;
 import com.ARVision.service.AuthService;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
@@ -30,57 +31,63 @@ public class AuthController {
 
     // ── Customer Register ──────────────────────────────────────
     @PostMapping("/register")
-    public ResponseEntity<AuthResponse> register(
+    public ResponseEntity<ApiResponse<AuthResponse>>register(
             @Valid @RequestBody RegisterRequest request,
             HttpServletResponse response) {
 
         AuthResult result = authService.registerCustomer(request);
         setRefreshTokenCookie(response, result.getRefreshToken());
 
-        return ResponseEntity.ok(result.getAuthResponse());
+        return ResponseEntity.ok(ApiResponse.success(result.getAuthResponse(),
+                "Registration successful"));
     }
 
     // ── Login ──────────────────────────────────────────────────
     @PostMapping("/login")
-    public ResponseEntity<AuthResponse> login(
+    public ResponseEntity<ApiResponse<AuthResponse>> login(
             @Valid @RequestBody LoginRequest request,
             HttpServletResponse response) {
 
         AuthResult result = authService.login(request);
         setRefreshTokenCookie(response, result.getRefreshToken());
-        return ResponseEntity.ok(result.getAuthResponse());
+        return ResponseEntity.ok(ApiResponse.success(result.getAuthResponse(),
+                "Login successful"));
     }
 
 
     // ── Refresh Token ──────────────────────────────────────────
     @PostMapping("/refresh")
-    public ResponseEntity<AuthResponse> refresh(
+    public ResponseEntity<ApiResponse<AuthResponse>> refresh(
             HttpServletRequest request,
             HttpServletResponse response) {
 
         // Read refresh token from cookie (not request body)
         String refreshToken = extractRefreshTokenFromCookie(request);
         if (refreshToken == null) {
-            return ResponseEntity.status(401).build();
+                return ResponseEntity.status(401)
+                    .body(ApiResponse.error("Refresh token not found"));
         }
 
         AuthResult result = authService.refreshToken(refreshToken);
         setRefreshTokenCookie(response, result.getRefreshToken());
-        return ResponseEntity.ok(result.getAuthResponse());
+        return ResponseEntity.ok(ApiResponse.success(result.getAuthResponse(),
+            "Token refreshed successfully"));
     }
 
     // ── Super Admin: Create Admin ──────────────────────────────
 
     @PostMapping("/admin/create")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
-    public ResponseEntity<AuthResponse> createAdmin(
+    public ResponseEntity<ApiResponse<AuthResponse>> createAdmin(
             @Valid @RequestBody CreateAdminRequest request,
             @AuthenticationPrincipal String email) {
-        return ResponseEntity.ok(authService.createAdmin(request, email));
+        return ResponseEntity.ok(ApiResponse.success(
+                authService.createAdmin(request, email),
+                "Admin created successfully"));
     }
     // ── Logout ─────────────────────────────────────────────────
     @PostMapping("/logout")
-    public ResponseEntity<String> logout(
+    public ResponseEntity<ApiResponse<Void>> logout(
             @AuthenticationPrincipal String email,
             HttpServletRequest request,
             HttpServletResponse response) {
@@ -92,7 +99,8 @@ public class AuthController {
 
         // Clear the cookie
         clearRefreshTokenCookie(response);
-        return ResponseEntity.ok("Logged out successfully");
+        return ResponseEntity.ok(ApiResponse.success(null,
+            "Logged out successfully"));
     }
 
     // ── Cookie Helpers ─────────────────────────────────────────

@@ -3,6 +3,7 @@ package com.ARVision.service;
 import com.ARVision.dto.dashboard.*;
 import com.ARVision.entity.Order;
 import com.ARVision.entity.Payment;
+import com.ARVision.exception.BadRequestException;
 import com.ARVision.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -89,11 +90,11 @@ public class DashboardService {
 
         // Validate range
         if (fromDate.isAfter(toDate)) {
-            throw new RuntimeException("From date cannot be after to date");
+                  throw new BadRequestException("From date cannot be after to date");
         }
 
         if (fromDate.plusDays(90).isBefore(toDate)) {
-            throw new RuntimeException("Date range cannot exceed 90 days");
+                  throw new BadRequestException("Date range cannot exceed 90 days");
         }
 
         LocalDateTime fromDateTime = fromDate.atStartOfDay();

@@ -2,6 +2,9 @@ package com.ARVision.service;
 
 import com.ARVision.dto.order.*;
 import com.ARVision.entity.*;
+import com.ARVision.exception.BadRequestException;
+import com.ARVision.exception.ResourceNotFoundException;
+import com.ARVision.exception.UnauthorizedException;
 import com.ARVision.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.*;
@@ -28,7 +31,7 @@ public class OrderService {
     // ── Get customer ───────────────────────────────────────────
     private Customer getCustomer(String email) {
         return customerRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Customer not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Customer", null));
     }
 
     // ── Generate order number ──────────────────────────────────
@@ -82,7 +85,6 @@ public class OrderService {
     }
 
     // ── Resolve shipping address ───────────────────────────────
-     // User provided a new address
     private String resolveAddress(
             Customer customer,
             AddressDto requestAddress,
@@ -101,7 +103,7 @@ public class OrderService {
             if (updateSaved) {
                 Customer freshCustomer = customerRepository
                         .findById(customer.getUserId())
-                        .orElseThrow(() -> new RuntimeException("Customer not found"));
+                        .orElseThrow(() -> new ResourceNotFoundException("Customer", customer.getUserId()));
                 freshCustomer.setShippingAddress(resolvedAddress);
                 customerRepository.saveAndFlush(freshCustomer);
                 System.out.println("Address saved: " + freshCustomer.getShippingAddress());
@@ -110,9 +112,7 @@ public class OrderService {
         } else if (customer.getShippingAddress() != null) {
             resolvedAddress = customer.getShippingAddress();
         } else {
-            throw new RuntimeException(
-                    "No shipping address found. Please provide a shipping address."
-            );
+            throw new BadRequestException("No shipping address found. Please provide a shipping address.");
         }
 
         return resolvedAddress;
@@ -145,7 +145,7 @@ public class OrderService {
 
         // ── Fetch cart with items explicitly ──────────────────────
         Cart cart = cartRepository.findByCustomerWithItems(customer.getUserId())
-                .orElseThrow(() -> new RuntimeException("No cart found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Cart", null));
 
         System.out.println("=== CART DEBUG ===");
         System.out.println("Cart ID: " + cart.getCartId());
@@ -153,7 +153,7 @@ public class OrderService {
                 (cart.getCartItems() != null ? cart.getCartItems().size() : "NULL"));
 
         if (cart.getCartItems() == null || cart.getCartItems().isEmpty()) {
-            throw new RuntimeException("Cart is empty. Add products before ordering.");
+            throw new BadRequestException("Cart is empty. Add products before ordering.");
         }
 
         // ── Resolve and save address ───────────────────────────────
@@ -182,9 +182,8 @@ public class OrderService {
             Product product = cartItem.getProduct();
 
             if (product.getStockQuantity() < cartItem.getQuantity()) {
-                throw new RuntimeException(
-                        "Insufficient stock for: " + product.getName()
-                                + ". Available: " + product.getStockQuantity()
+                throw new BadRequestException(
+                        "Only " + product.getStockQuantity() + " items available in stock"
                 );
             }
 
@@ -213,20 +212,21 @@ public class OrderService {
 
         // ── Reload fresh from DB ───────────────────────────────────
         Order freshOrder = orderRepository.findByIdWithItems(savedOrder.getOrderId())
-                .orElseThrow(() -> new RuntimeException("Order not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Order", savedOrder.getOrderId()));
         return toResponse(freshOrder);
     }
+
     // ── Place DIRECT ORDER (without cart) ─────────────────────
     @Transactional
     public OrderResponse placeDirectOrder(String email, DirectOrderRequest request) {
         Customer customer = getCustomer(email);
 
         Product product = productRepository.findById(request.getProductId())
-                .orElseThrow(() -> new RuntimeException("Product not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Product", request.getProductId()));
 
         // Validate stock
         if (product.getStockQuantity() < request.getQuantity()) {
-            throw new RuntimeException(
+            throw new BadRequestException(
                     "Only " + product.getStockQuantity() + " items available in stock"
             );
         }
@@ -271,7 +271,7 @@ public class OrderService {
         orderRepository.save(savedOrder);
 
         Order freshOrder = orderRepository.findByIdWithItems(savedOrder.getOrderId())
-                .orElseThrow(() -> new RuntimeException("Order not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Order", savedOrder.getOrderId()));
         return toResponse(freshOrder);
 
     }
@@ -282,30 +282,30 @@ public class OrderService {
         Customer customer = getCustomer(email);
 
         Order order = orderRepository.findByIdWithItems(orderId)
-                .orElseThrow(() -> new RuntimeException("Order not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Order", orderId));
 
         // Security — customer can only cancel their own orders
         if (!order.getCustomer().getUserId().equals(customer.getUserId())) {
-            throw new RuntimeException("Unauthorized to cancel this order");
+            throw new UnauthorizedException("You can only cancel your own orders");
         }
 
         // Cannot cancel if SHIPPED or beyond
         if (order.getStatus() == Order.OrderStatus.SHIPPED ||
                 order.getStatus() == Order.OrderStatus.DELIVERED) {
-            throw new RuntimeException(
+            throw new BadRequestException(
                     "Cannot cancel order. Order has already been " +
                             order.getStatus().name().toLowerCase()
             );
         }
 
-                // Paid orders can no longer be canceled through the customer flow
-                if (order.getPayment() != null
-                                && order.getPayment().getStatus() == Payment.PaymentStatus.COMPLETED) {
-                        throw new RuntimeException("Cannot cancel a paid order");
-                }
+        // Paid orders can no longer be canceled through the customer flow
+        if (order.getPayment() != null
+                        && order.getPayment().getStatus() == Payment.PaymentStatus.COMPLETED) {
+                throw new BadRequestException("Cannot cancel a paid order");
+        }
 
         if (order.getStatus() == Order.OrderStatus.CANCELLED) {
-            throw new RuntimeException("Order is already cancelled");
+            throw new BadRequestException("Order is already cancelled");
         }
 
         // Restore stock
@@ -337,11 +337,11 @@ public class OrderService {
         Customer customer = getCustomer(email);
 
         Order order = orderRepository.findByIdWithItems(orderId)
-                .orElseThrow(() -> new RuntimeException("Order not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Order", orderId));
 
         // Security check
         if (!order.getCustomer().getUserId().equals(customer.getUserId())) {
-            throw new RuntimeException("Unauthorized to view this order");
+            throw new UnauthorizedException("You can only view your own orders");
         }
 
         return toResponse(order);
@@ -367,15 +367,15 @@ public class OrderService {
             OrderStatusUpdateRequest request) {
 
         Order order = orderRepository.findByIdWithItems(orderId)
-                .orElseThrow(() -> new RuntimeException("Order not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Order", orderId));
 
         // Prevent going backwards in status
         if (order.getStatus() == Order.OrderStatus.DELIVERED) {
-            throw new RuntimeException("Cannot change status of a delivered order");
+            throw new BadRequestException("Cannot change status of a delivered order");
         }
 
         if (order.getStatus() == Order.OrderStatus.CANCELLED) {
-            throw new RuntimeException("Cannot change status of a cancelled order");
+            throw new BadRequestException("Cannot change status of a cancelled order");
         }
 
         order.setStatus(request.getStatus());
