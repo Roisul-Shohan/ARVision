@@ -55,4 +55,34 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
     // Check stock availability
     boolean existsByProductIdAndStockQuantityGreaterThan(Long productId, int quantity);
+    // Count low stock
+    @Query("SELECT COUNT(p) FROM Product p WHERE p.stockQuantity <= :threshold " +
+            "AND p.stockQuantity > 0")
+    long countLowStock(@Param("threshold") int threshold);
+
+    // Count out of stock
+    long countByStockQuantity(int stockQuantity);
+
+    // Count products with AR model
+    @Query("SELECT COUNT(p) FROM Product p WHERE p.arModel IS NOT NULL")
+    long countProductsWithAR();
+
+    // Top selling products
+    @Query("""
+    SELECT p.productId,
+           p.name,
+           p.category,
+           p.imageUrl,
+           p.stockQuantity,
+           COALESCE(SUM(oi.quantity), 0) as totalSold,
+           COALESCE(SUM(oi.subtotal), 0) as totalRevenue,
+           CASE WHEN p.arModel IS NOT NULL THEN true ELSE false END as hasAR
+    FROM Product p
+    LEFT JOIN OrderItem oi ON oi.product = p
+    LEFT JOIN oi.order o ON o.status != 'CANCELLED'
+    GROUP BY p.productId, p.name, p.category,
+             p.imageUrl, p.stockQuantity, p.arModel
+    ORDER BY totalSold DESC
+""")
+    List<Object[]> findTopSellingProducts(Pageable pageable);
 }

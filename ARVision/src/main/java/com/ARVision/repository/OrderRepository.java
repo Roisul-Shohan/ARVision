@@ -7,6 +7,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 public interface OrderRepository extends JpaRepository<Order, Long> {
@@ -68,4 +70,52 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     """)
     java.util.List<Order> findByCustomerIdWithItems(
             @Param("customerId") Long customerId);
+
+    // Revenue today
+    @Query("SELECT COALESCE(SUM(o.totalAmount), 0) FROM Order o " +
+            "WHERE o.status != 'CANCELLED' " +
+            "AND CAST(o.orderDate AS date) = CURRENT_DATE")
+    float getRevenueToday();
+
+    // Revenue this month — use EXTRACT instead of MONTH/YEAR
+    @Query("SELECT COALESCE(SUM(o.totalAmount), 0) FROM Order o " +
+            "WHERE o.status != 'CANCELLED' " +
+            "AND EXTRACT(MONTH FROM o.orderDate) = EXTRACT(MONTH FROM CURRENT_DATE) " +
+            "AND EXTRACT(YEAR FROM o.orderDate) = EXTRACT(YEAR FROM CURRENT_DATE)")
+    float getRevenueThisMonth();
+
+    // Count today
+    @Query("SELECT COUNT(o) FROM Order o WHERE o.status = :status " +
+            "AND CAST(o.orderDate AS date) = CURRENT_DATE")
+    long countByStatusToday(@Param("status") Order.OrderStatus status);
+
+    // Orders in date range
+    @Query("""
+    SELECT o FROM Order o
+    WHERE o.orderDate >= :fromDate
+    AND o.orderDate <= :toDate
+    ORDER BY o.orderDate ASC
+""")
+    List<Order> findOrdersInDateRange(
+            @Param("fromDate") LocalDateTime fromDate,
+            @Param("toDate") LocalDateTime toDate
+    );
+
+    // Daily breakdown in date range
+    @Query("""
+    SELECT CAST(o.orderDate AS date) as date,
+           COUNT(o) as orderCount,
+           COALESCE(SUM(o.totalAmount), 0) as revenue
+    FROM Order o
+    WHERE o.orderDate >= :fromDate
+    AND o.orderDate <= :toDate
+    AND o.status != 'CANCELLED'
+    GROUP BY CAST(o.orderDate AS date)
+    ORDER BY CAST(o.orderDate AS date) ASC
+""")
+    List<Object[]> getDailyBreakdown(
+            @Param("fromDate") LocalDateTime fromDate,
+            @Param("toDate") LocalDateTime toDate
+    );
+
 }
