@@ -18,43 +18,42 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-    private final JwtAuthFilter jwtAuthFilter;
-    private final JwtAuthenticationEntryPoint authenticationEntryPoint;
+        private final JwtAuthFilter jwtAuthFilter;
+        private final JwtAuthenticationEntryPoint authenticationEntryPoint;
 
-    @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        http
-                .cors(cors -> cors.configure(http))
-                .csrf(csrf -> csrf.disable())
-                .sessionManagement(session ->
-                        session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(auth -> auth
-                        // Public endpoints
-                        .requestMatchers(
-                                "/api/auth/register",
-                                "/api/auth/login",
-                                "/api/auth/refresh",
-                                "/api/products/**",
-                                "/api/payments/webhook"
-                        ).permitAll()
-                        .requestMatchers("/api/auth/admin/create").hasRole("SUPER_ADMIN")
-                        // Admin endpoints
-                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                        // Customer endpoints
-                        .requestMatchers("/api/customer/**").hasRole("CUSTOMER")
-                        // Everything else needs auth
-                        .anyRequest().authenticated()
-                )
-                .exceptionHandling(ex -> ex
-                        .authenticationEntryPoint(authenticationEntryPoint)
-                )
-                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+        @Bean
+        public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+                http
+                                .cors(cors -> cors.configure(http))
+                                .csrf(csrf -> csrf.disable())
+                                .sessionManagement(session -> session
+                                                .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                                .authorizeHttpRequests(auth -> auth
+                                                // Public endpoints
+                                                .requestMatchers(
+                                                                "/api/auth/register",
+                                                                "/api/auth/login",
+                                                                "/api/auth/refresh",
+                                                                "/api/products/**",
+                                                                "/api/payments/webhook",
+                                                                "/api/chatbot/**")
+                                                .permitAll()
+                                                .requestMatchers("/api/auth/admin/create").hasRole("SUPER_ADMIN")
+                                                // Admin endpoints
+                                                .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                                                // Customer endpoints
+                                                .requestMatchers("/api/customer/**").hasRole("CUSTOMER")
+                                                // Everything else needs auth
+                                                .anyRequest().authenticated())
+                                .exceptionHandling(ex -> ex
+                                                .authenticationEntryPoint(authenticationEntryPoint))
+                                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
-        return http.build();
-    }
+                return http.build();
+        }
 
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
-    }
+        @Bean
+        public PasswordEncoder passwordEncoder() {
+                return new BCryptPasswordEncoder();
+        }
 }
