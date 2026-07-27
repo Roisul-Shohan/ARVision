@@ -25,13 +25,16 @@ public class ProductController {
     // GET /api/products?page=0&size=12&sortBy=createdAt&sortDir=desc
     @GetMapping
     public ResponseEntity<ApiResponse<Page<ProductResponse>>> getAllProducts(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "12") int size,
-            @RequestParam(defaultValue = "createdAt") String sortBy,
-            @RequestParam(defaultValue = "desc") String sortDir) {
+            @RequestParam(name = "page", defaultValue = "0") String page,
+            @RequestParam(name = "size", defaultValue = "12") String size,
+            @RequestParam(name = "sortBy", defaultValue = "createdAt") String sortBy,
+            @RequestParam(name = "sortDir", defaultValue = "desc") String sortDir) {
+
+        int pageNum = parseIntOrDefault(page, 0);
+        int pageSize = Math.min(Math.max(parseIntOrDefault(size, 12), 1), 100);
 
         return ResponseEntity.ok(ApiResponse.success(
-                productService.getAllProducts(page, size, sortBy, sortDir),
+                productService.getAllProducts(pageNum, pageSize, sortBy, sortDir),
                 "Products fetched successfully"));
     }
 
@@ -49,11 +52,14 @@ public class ProductController {
     @GetMapping("/search")
     public ResponseEntity<ApiResponse<Page<ProductResponse>>> search(
             @RequestParam(required = false) String keyword,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "12") int size) {
+            @RequestParam(name = "page", defaultValue = "0") String page,
+            @RequestParam(name = "size", defaultValue = "12") String size) {
+
+        int pageNum = parseIntOrDefault(page, 0);
+        int pageSize = Math.min(Math.max(parseIntOrDefault(size, 12), 1), 100);
 
         return ResponseEntity.ok(ApiResponse.success(
-                productService.search(keyword, page, size),
+                productService.search(keyword, pageNum, pageSize),
                 "Search results fetched"));
     }
 
@@ -63,17 +69,35 @@ public class ProductController {
     public ResponseEntity<ApiResponse<Page<ProductResponse>>> filterProducts(
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String category,
-            @RequestParam(required = false) Float minPrice,
-            @RequestParam(required = false) Float maxPrice,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "12") int size,
-            @RequestParam(defaultValue = "price") String sortBy,
-            @RequestParam(defaultValue = "asc") String sortDir) {
+            @RequestParam(required = false) String minPrice,
+            @RequestParam(required = false) String maxPrice,
+            @RequestParam(name = "page", defaultValue = "0") String page,
+            @RequestParam(name = "size", defaultValue = "12") String size,
+            @RequestParam(name = "sortBy", defaultValue = "price") String sortBy,
+            @RequestParam(name = "sortDir", defaultValue = "asc") String sortDir) {
+
+        int pageNum = parseIntOrDefault(page, 0);
+        int pageSize = Math.min(Math.max(parseIntOrDefault(size, 12), 1), 100);
+        Float minP = parseFloatOrNull(minPrice);
+        Float maxP = parseFloatOrNull(maxPrice);
 
         return ResponseEntity.ok(ApiResponse.success(
             productService.filterProducts(
-                keyword, category, minPrice, maxPrice, page, size, sortBy, sortDir),
+                keyword, category, minP, maxP, pageNum, pageSize, sortBy, sortDir),
             "Products filtered successfully"));
+    }
+
+    private static Float parseFloatOrNull(String raw) {
+        if (raw == null || raw.isBlank()) return null;
+        try {
+            String t = raw.trim();
+            if (t.length() >= 2 && t.charAt(0) == '"' && t.charAt(t.length() - 1) == '"') {
+                t = t.substring(1, t.length() - 1);
+            }
+            return Float.parseFloat(t);
+        } catch (NumberFormatException ex) {
+            return null;
+        }
     }
 
     // All categories for filter dropdown
@@ -91,13 +115,38 @@ public class ProductController {
     @GetMapping("/{id}/reviews")
     public ResponseEntity<ApiResponse<Page<ReviewResponse>>> getProductReviews(
             @PathVariable Long id,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size,
-            @RequestParam(defaultValue = "desc") String sortDir) {
+            @RequestParam(name = "page", defaultValue = "0") String page,
+            // Accept as String and parse defensively — some clients send quoted
+            // values like ?size="5" which Spring's int converter rejects with
+            // "For input string: \"5\"" and 400s. Parsing manually falls back to the
+            // default whenever the value can't be parsed as an int.
+            @RequestParam(name = "size", defaultValue = "10") String size,
+            @RequestParam(name = "sortDir", defaultValue = "desc") String sortDir) {
+
+        int pageNum = parseIntOrDefault(page, 0);
+        int pageSize = parseIntOrDefault(size, 10);
+        if (pageSize <= 0 || pageSize > 100) pageSize = 10;     // sanity cap
+        if (pageNum < 0) pageNum = 0;
 
         return ResponseEntity.ok(ApiResponse.success(
-                reviewService.getReviewsByProduct(id, page, size, sortDir),
+                reviewService.getReviewsByProduct(id, pageNum, pageSize, sortDir),
                 "Reviews fetched successfully"));
+    }
+
+    private static int parseIntOrDefault(String raw, int fallback) {
+        if (raw == null || raw.isBlank()) return fallback;
+        try {
+            // Strip surrounding quotes if the client sent ?size="5"
+            String trimmed = raw.trim();
+            if (trimmed.length() >= 2
+                    && trimmed.charAt(0) == '"'
+                    && trimmed.charAt(trimmed.length() - 1) == '"') {
+                trimmed = trimmed.substring(1, trimmed.length() - 1);
+            }
+            return Integer.parseInt(trimmed);
+        } catch (NumberFormatException ex) {
+            return fallback;
+        }
     }
 
     // GET /api/products/{id}/rating

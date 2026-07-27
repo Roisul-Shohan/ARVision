@@ -51,18 +51,21 @@ public class ReviewService {
     }
 
     private ReviewResponse toResponse(Review review, Long currentCustomerUserId) {
+        Product product = review.getProduct();
+        Customer customer = review.getCustomer();
         return ReviewResponse.builder()
                 .reviewId(review.getReviewId())
-                .productId(review.getProduct().getProductId())
-                .customerId(review.getCustomer().getUserId())
-                .customerName(review.getCustomer().getName())
+                .productId(product != null ? product.getProductId() : null)
+                .customerId(customer != null ? customer.getUserId() : null)
+                .customerName(customer != null ? customer.getName() : null)
                 .rating(review.getRating())
                 .comment(review.getComment())
                 .createdAt(review.getCreatedAt())
                 .updatedAt(review.getUpdatedAt())
                 .ownedByCurrentCustomer(
                         currentCustomerUserId != null
-                                && currentCustomerUserId.equals(review.getCustomer().getUserId()))
+                                && customer != null
+                                && currentCustomerUserId.equals(customer.getUserId()))
                 .build();
     }
 
@@ -111,6 +114,7 @@ public class ReviewService {
     // ── read ops ────────────────────────────────────────────────
 
     /** Public paginated reviews for a product. */
+    @Transactional(readOnly = true)
     public Page<ReviewResponse> getReviewsByProduct(
             Long productId, int page, int size, String sortDir) {
 
@@ -121,12 +125,20 @@ public class ReviewService {
                 : Sort.by("createdAt").descending();
         Pageable pageable = PageRequest.of(page, size, sort);
 
-        return reviewRepository
-                .findByProductOrderByCreatedAtDesc(product, pageable)
-                .map(review -> toResponse(review, null));
+        Page<Review> reviews = reviewRepository
+                .findByProductOrderByCreatedAtDesc(product, pageable);
+        // Force lazy-init of customer proxy while session is open
+        reviews.forEach(r -> {
+            if (r.getCustomer() != null) {
+                r.getCustomer().getUserId();
+                r.getCustomer().getName();
+            }
+        });
+        return reviews.map(review -> toResponse(review, null));
     }
 
     /** Public aggregate rating for a product. */
+    @Transactional(readOnly = true)
     public RatingSummary getRatingSummary(Long productId) {
         Product product = getProductOrThrow(productId);
 
@@ -151,14 +163,22 @@ public class ReviewService {
     }
 
     /** Customer fetches their own review for a product (null if none). */
+    @Transactional(readOnly = true)
     public ReviewResponse getMyReviewForProduct(String email, Long productId) {
         Customer customer = getCustomer(email);
         Product product = getProductOrThrow(productId);
 
-        return reviewRepository
+        Review review = reviewRepository
                 .findByProductAndCustomer_UserId(product, customer.getUserId())
-                .map(review -> toResponse(review, customer.getUserId()))
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "You have not reviewed this product yet"));
+
+        // Force lazy-init inside the transaction
+        if (review.getCustomer() != null) {
+            review.getCustomer().getUserId();
+            review.getCustomer().getName();
+        }
+
+        return toResponse(review, customer.getUserId());
     }
 }

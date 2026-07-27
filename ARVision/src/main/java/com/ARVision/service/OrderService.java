@@ -44,19 +44,21 @@ public class OrderService {
 
     // ── Map to response ────────────────────────────────────────
     private OrderResponse toResponse(Order order) {
-        List<OrderResponse.OrderItemResponse> itemResponses = order.getOrderItems()
-                .stream()
+        List<OrderItem> orderItems = order.getOrderItems() != null
+                ? order.getOrderItems() : java.util.Collections.emptyList();
+
+        List<OrderResponse.OrderItemResponse> itemResponses = orderItems.stream()
                 .map(item -> OrderResponse.OrderItemResponse.builder()
                         .orderItemId(item.getOrderItemId())
-                        .productId(item.getProduct().getProductId())
-                        .productName(item.getProduct().getName())
-                        .productImage(item.getProduct().getImageUrl())
-                        .category(item.getProduct().getCategory())
+                        .productId(item.getProduct() != null ? item.getProduct().getProductId() : null)
+                        .productName(item.getProduct() != null ? item.getProduct().getName() : null)
+                        .productImage(item.getProduct() != null ? item.getProduct().getImageUrl() : null)
+                        .category(item.getProduct() != null ? item.getProduct().getCategory() : null)
                         .quantity(item.getQuantity())
                         .unitPrice(item.getPrice())
                         .subtotal(item.getSubtotal())
-                        .hasArModel(item.getProduct().getArModel() != null)
-                        .arModelUrl(item.getProduct().getArModel() != null
+                        .hasArModel(item.getProduct() != null && item.getProduct().getArModel() != null)
+                        .arModelUrl(item.getProduct() != null && item.getProduct().getArModel() != null
                                 ? item.getProduct().getArModel().getFileUrl()
                                 : null)
                         .build())
@@ -67,12 +69,16 @@ public class OrderService {
                 && (order.getPayment() == null
                 || order.getPayment().getStatus() != Payment.PaymentStatus.COMPLETED);
 
+        Long customerId = order.getCustomer() != null ? order.getCustomer().getUserId() : null;
+        String customerName = order.getCustomer() != null ? order.getCustomer().getName() : null;
+        String customerEmail = order.getCustomer() != null ? order.getCustomer().getEmail() : null;
+
         return OrderResponse.builder()
                 .orderId(order.getOrderId())
                 .orderNumber(order.getOrderNumber())
-                .customerId(order.getCustomer().getUserId())
-                .customerName(order.getCustomer().getName())
-                .customerEmail(order.getCustomer().getEmail())
+                .customerId(customerId)
+                .customerName(customerName)
+                .customerEmail(customerEmail)
                 .status(order.getStatus())
                 .canCancel(canCancel)
                 .totalAmount(order.getTotalAmount())
@@ -321,14 +327,38 @@ public class OrderService {
     }
 
     // ── Get customer's orders ──────────────────────────────────
-    @Transactional
+    @Transactional(readOnly = true)
     public Page<OrderResponse> getMyOrders(String email, int page, int size) {
         Customer customer = getCustomer(email);
         Pageable pageable = PageRequest.of(page, size);
-        return orderRepository
+        Page<Order> orders = orderRepository
                 .findByCustomerUserIdOrderByOrderDateDesc(
-                        customer.getUserId(), pageable)
-                .map(this::toResponse);
+                        customer.getUserId(), pageable);
+        // Force lazy-init while the session is still open
+        orders.forEach(this::initializeOrderRefs);
+        return orders.map(this::toResponse);
+    }
+
+    // ── Touch lazy associations inside the transaction ────────
+    private void initializeOrderRefs(Order order) {
+        if (order == null) return;
+        if (order.getOrderItems() != null) {
+            order.getOrderItems().size();
+            order.getOrderItems().forEach(oi -> {
+                if (oi.getProduct() != null) {
+                    oi.getProduct().getProductId();
+                    if (oi.getProduct().getArModel() != null) {
+                        oi.getProduct().getArModel().getFileUrl();
+                    }
+                }
+            });
+        }
+        if (order.getPayment() != null) {
+            order.getPayment().getStatus();
+        }
+        if (order.getCustomer() != null) {
+            order.getCustomer().getUserId();
+        }
     }
 
     // ── Get single order ───────────────────────────────────────
@@ -348,7 +378,7 @@ public class OrderService {
     }
 
     // ── ADMIN: Get all orders ──────────────────────────────────
-    @Transactional
+    @Transactional(readOnly = true)
     public Page<OrderResponse> getAllOrders(
             String keyword,
             Order.OrderStatus status,
@@ -356,8 +386,9 @@ public class OrderService {
             int size) {
 
         Pageable pageable = PageRequest.of(page, size);
-        return orderRepository.searchOrders(keyword, status, pageable)
-                .map(this::toResponse);
+        Page<Order> orders = orderRepository.searchOrders(keyword, status, pageable);
+        orders.forEach(this::initializeOrderRefs);
+        return orders.map(this::toResponse);
     }
 
     // ── ADMIN: Update order status ─────────────────────────────

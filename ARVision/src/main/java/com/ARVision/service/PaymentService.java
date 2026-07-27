@@ -62,14 +62,16 @@ private Customer getCustomer(String email) {
     }
 
         private PaymentResponse toResponse(Payment payment) {
+                Order order = payment.getOrder();
                 boolean refundable = payment.getStatus() == Payment.PaymentStatus.COMPLETED
-                                && (payment.getOrder().getStatus() == Order.OrderStatus.PENDING
-                                || payment.getOrder().getStatus() == Order.OrderStatus.PROCESSING);
+                                && order != null
+                                && (order.getStatus() == Order.OrderStatus.PENDING
+                                || order.getStatus() == Order.OrderStatus.PROCESSING);
 
                 return PaymentResponse.builder()
                                 .paymentId(payment.getPaymentId())
-                                .orderId(payment.getOrder().getOrderId())
-                                .orderNumber(payment.getOrder().getOrderNumber())
+                                .orderId(order != null ? order.getOrderId() : null)
+                                .orderNumber(order != null ? order.getOrderNumber() : null)
                                 .stripePaymentIntentId(payment.getStripePaymentIntentId())
                                 .method(payment.getMethod())
                                 .amount(payment.getAmount())
@@ -122,13 +124,21 @@ private Customer getCustomer(String email) {
                 PaymentIntent paymentIntent = PaymentIntent.create(params);
 
                 Payment payment = paymentRepository.findByOrderOrderId(orderId)
-                                .orElse(new Payment());
-
-                payment.setOrder(order);
-                payment.setAmount(order.getTotalAmount());
-                payment.setMethod("STRIPE");
-                payment.setStripePaymentIntentId(paymentIntent.getId());
-                payment.setStatus(Payment.PaymentStatus.PENDING);
+                                .map(p -> {
+                                        // Reuse the existing row — refresh intent id, reset to PENDING if it had failed
+                                        p.setStripePaymentIntentId(paymentIntent.getId());
+                                        p.setStatus(Payment.PaymentStatus.PENDING);
+                                        return p;
+                                })
+                                .orElseGet(() -> {
+                                        Payment p = new Payment();
+                                        p.setOrder(order);
+                                        p.setAmount(order.getTotalAmount());
+                                        p.setMethod("STRIPE");
+                                        p.setStripePaymentIntentId(paymentIntent.getId());
+                                        p.setStatus(Payment.PaymentStatus.PENDING);
+                                        return p;
+                                });
                 paymentRepository.save(payment);
 
                 return PaymentIntentResponse.builder()
@@ -348,10 +358,19 @@ private Customer getCustomer(String email) {
                 orderRepository.save(order);
         }
 
+        @Transactional(readOnly = true)
         public Page<PaymentResponse> getAllPayments(Payment.PaymentStatus status, int page, int size) {
                 Pageable pageable = PageRequest.of(page, size);
-                return paymentRepository.findAllWithFilter(status, pageable)
-                                .map(this::toResponse);
+                Page<Payment> payments = paymentRepository.findAllWithFilter(status, pageable);
+                // Force lazy order refs while session is open
+                payments.forEach(p -> {
+                        if (p.getOrder() != null) {
+                                p.getOrder().getOrderId();
+                                p.getOrder().getOrderNumber();
+                                p.getOrder().getStatus();
+                        }
+                });
+                return payments.map(this::toResponse);
         }
 
         public Map<String, Object> getPaymentStats() {
