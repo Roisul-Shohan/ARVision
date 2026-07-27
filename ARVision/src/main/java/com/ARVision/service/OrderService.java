@@ -386,7 +386,10 @@ public class OrderService {
             int size) {
 
         Pageable pageable = PageRequest.of(page, size);
-        Page<Order> orders = orderRepository.searchOrders(keyword, status, pageable);
+        // Normalize null/blank keyword to "" so the JPQL never binds a
+        // null string parameter (which PostgreSQL can type-cast to bytea).
+        String safeKeyword = (keyword == null) ? "" : keyword.trim();
+        Page<Order> orders = orderRepository.searchOrders(safeKeyword, status, pageable);
         orders.forEach(this::initializeOrderRefs);
         return orders.map(this::toResponse);
     }

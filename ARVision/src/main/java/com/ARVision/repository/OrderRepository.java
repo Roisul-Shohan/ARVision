@@ -25,12 +25,17 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
             Order.OrderStatus status, Pageable pageable);
 
     // Admin — search by customer email or order number
+    // NOTE: We coerce null keyword to '' via COALESCE so PostgreSQL
+    //       never sees a NULL/binding-inferred type in LOWER(...) — that
+    //       previously raised "function lower(bytea) does not exist".
+    //       The outer OR is true when the merged keyword is blank,
+    //       which means "no filter".
     @Query("""
         SELECT o FROM Order o
-        WHERE (:keyword IS NULL
-               OR LOWER(o.orderNumber) LIKE LOWER(CONCAT('%', :keyword, '%'))
-               OR LOWER(o.customer.email) LIKE LOWER(CONCAT('%', :keyword, '%'))
-               OR LOWER(o.customer.name) LIKE LOWER(CONCAT('%', :keyword, '%')))
+        WHERE (LOWER(o.orderNumber)        LIKE LOWER(CONCAT('%', COALESCE(:keyword, ''), '%'))
+               OR LOWER(o.customer.email) LIKE LOWER(CONCAT('%', COALESCE(:keyword, ''), '%'))
+               OR LOWER(o.customer.name)  LIKE LOWER(CONCAT('%', COALESCE(:keyword, ''), '%'))
+               OR COALESCE(:keyword, '') = '')
         AND (:status IS NULL OR o.status = :status)
         ORDER BY o.orderDate DESC
     """)
