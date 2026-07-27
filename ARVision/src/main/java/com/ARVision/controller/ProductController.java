@@ -2,7 +2,10 @@ package com.ARVision.controller;
 
 import com.ARVision.dto.common.ApiResponse;
 import com.ARVision.dto.product.ProductResponse;
+import com.ARVision.dto.review.RatingSummary;
+import com.ARVision.dto.review.ReviewResponse;
 import com.ARVision.service.ProductService;
+import com.ARVision.service.ReviewService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
@@ -16,6 +19,7 @@ import java.util.List;
 public class ProductController {
 
     private final ProductService productService;
+    private final ReviewService reviewService;
 
     // Home page — all products with pagination and sorting
     // GET /api/products?page=0&size=12&sortBy=createdAt&sortDir=desc
@@ -79,5 +83,30 @@ public class ProductController {
         return ResponseEntity.ok(ApiResponse.success(
                 productService.getAllCategories(),
                 "Categories fetched successfully"));
+    }
+
+    // ── Reviews (public read) ───────────────────────────────────
+
+    // GET /api/products/{id}/reviews?page=0&size=10&sortDir=desc
+    @GetMapping("/{id}/reviews")
+    public ResponseEntity<ApiResponse<Page<ReviewResponse>>> getProductReviews(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "desc") String sortDir) {
+
+        return ResponseEntity.ok(ApiResponse.success(
+                reviewService.getReviewsByProduct(id, page, size, sortDir),
+                "Reviews fetched successfully"));
+    }
+
+    // GET /api/products/{id}/rating
+    @GetMapping("/{id}/rating")
+    public ResponseEntity<ApiResponse<RatingSummary>> getProductRating(
+            @PathVariable Long id) {
+
+        return ResponseEntity.ok(ApiResponse.success(
+                reviewService.getRatingSummary(id),
+                "Rating summary fetched successfully"));
     }
 }

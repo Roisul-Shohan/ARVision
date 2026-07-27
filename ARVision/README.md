@@ -54,7 +54,33 @@ https://arvision-jvan.onrender.com
 | `GET`  | `/api/admin/orders` | View all orders |
 | `GET`  | `/api/admin/payments` | View all payments |
 | `GET`  | `/api/admin/dashboard/stats` | Sales / revenue / counts |
+### Review & Rating Endpoints
 
+Customers can rate (1–5 stars) and comment once per product. Public read, authenticated write.
+
+|| Method | Endpoint | Auth | Description |
+||---|---|---|---|
+|| `GET`  | `/api/products/{id}/reviews?page=0&size=10&sortDir=desc` | No | Paginated reviews for a product |
+|| `GET`  | `/api/products/{id}/rating` | No | Aggregate `averageRating`, `totalReviews`, and a `{1..5 → count}` distribution |
+|| `POST` | `/api/customer/products/{id}/reviews` | CUSTOMER | Submit or update your review (upsert — one per customer per product) |
+|| `GET`  | `/api/customer/products/{id}/reviews/my` | CUSTOMER | Fetch your own review for the product |
+|| `DELETE` | `/api/customer/reviews/{reviewId}` | CUSTOMER | Delete your own review only |
+
+**Sample rating summary:**
+```json
+{
+  "productId": 1,
+  "averageRating": 4.32,
+  "totalReviews": 34,
+  "distribution": { "1": 1, "2": 2, "3": 4, "4": 10, "5": 17 }
+}
+```
+**Sample review request:**
+```json
+{ "rating": 5, "comment": "Looks exactly like the 3D model." }
+```
+
+Full request/response specs (status codes, validation, ownership flag) are documented in the root **`README.md`** under section **11. Review & Rating APIs**.
 ### Customer Endpoints
 
 | Method | Endpoint | Description |

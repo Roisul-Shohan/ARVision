@@ -1,3 +1,51 @@
+# ARVision
+
+A full-stack **Augmented Reality (AR) e-commerce platform** built with Spring Boot 3.5 + PostgreSQL + Cloudinary + Stripe. Admins upload `.glb` / `.usdz` 3D models for products; customers view them in AR via their phone cameras.
+
+🌐 **Live Demo:** https://arvision-jvan.onrender.com
+
+---
+
+## 🔑 Demo Credentials
+
+Use these to log in and try the admin dashboard:
+
+| Role | Email | Password |
+|---|---|---|
+| **SUPER_ADMIN** | `roisul192@gmail.com` | `123456` |
+
+> Admin login is plain-text compared against `123456` in `AuthService.login`. To change it, edit `src/main/java/com/ARVision/service/AuthService.java` line 65 and redeploy.
+
+---
+
+## 🧪 Try It in Postman (60 seconds)
+
+1. **Login as super admin:**
+   ```
+   POST https://arvision-jvan.onrender.com/api/auth/login
+   Content-Type: application/json
+
+   { "email": "roisul192@gmail.com", "password": "123456" }
+   ```
+   Copy the `accessToken` from the response.
+
+2. **Authorize:** in Postman → Authorization → Type **Bearer Token** → paste `accessToken`.
+
+3. **List products:**
+   ```
+   GET https://arvision-jvan.onrender.com/api/products
+   ```
+
+4. **Upload an AR model** (uses Postman **Body → form-data** with key `file`):
+   ```
+   POST https://arvision-jvan.onrender.com/api/admin/products/1/ar-model
+   Authorization: Bearer <accessToken>
+   Body (form-data):
+     file   →  select a local .glb or .usdz file (max 100 MB)
+   ```
+   The file is streamed to Cloudinary; the returned `secure_url` is what the frontend AR viewer loads.
+
+---
 
 ## Technology Stack
 
@@ -1694,3 +1742,187 @@ Returned when user's RBAC role does not possess the permissions necessary to acc
   "message": "You do not have permission to access this resource."
 }
 ```
+
+---
+
+### 11. Review & Rating APIs
+
+Base URL: `/api/products/{id}/...` (public reads) and `/api/customer` (authenticated writes)
+
+Each product has a **one review per customer** policy — submitting again updates the existing row (upsert).
+
+---
+
+#### 11.1 Get Reviews for a Product (Public)
+
+```
+GET /api/products/{id}/reviews?page=0&size=10&sortDir=desc
+```
+
+**Auth Required:** No
+
+**Query Parameters:**
+
+| Parameter | Default | Description |
+|---|---|---|
+| page | 0 | Page number (0-based) |
+| size | 10 | Items per page |
+| sortDir | desc | `asc` or `desc` (sorts by `createdAt`) |
+
+**Success Response (200):**
+
+```json
+{
+  "success": true,
+  "message": "Reviews fetched successfully",
+  "data": {
+    "content": [
+      {
+        "reviewId": 12,
+        "productId": 1,
+        "customerId": 7,
+        "customerName": "Roisul Islam",
+        "rating": 5,
+        "comment": "Looks exactly like the 3D model. Loved it!",
+        "createdAt": "2026-07-20T09:30:00",
+        "updatedAt": "2026-07-20T09:30:00",
+        "ownedByCurrentCustomer": false
+      }
+    ],
+    "totalElements": 34,
+    "totalPages": 4,
+    "size": 10,
+    "number": 0,
+    "first": true,
+    "last": false
+  },
+  "timestamp": "2026-07-27T11:00:00"
+}
+```
+
+> `ownedByCurrentCustomer` is `true` only when a logged-in customer calls this endpoint AND the review belongs to them. Anonymous calls always receive `false`.
+
+---
+
+#### 11.2 Get Product Rating Summary (Public)
+
+```
+GET /api/products/{id}/rating
+```
+
+**Auth Required:** No
+
+**Success Response (200):**
+
+```json
+{
+  "success": true,
+  "message": "Rating summary fetched successfully",
+  "data": {
+    "productId": 1,
+    "averageRating": 4.32,
+    "totalReviews": 34,
+    "distribution": {
+      "1": 1,
+      "2": 2,
+      "3": 4,
+      "4": 10,
+      "5": 17
+    }
+  },
+  "timestamp": "2026-07-27T11:00:00"
+}
+```
+
+> `averageRating` is rounded to 2 decimal places. `distribution` always contains keys `1..5`; missing buckets default to `0`. Use this to render the star-bar UI.
+
+---
+
+#### 11.3 Submit or Update My Review
+
+```
+POST /api/customer/products/{productId}/reviews
+```
+
+**Auth Required:** CUSTOMER
+
+**Request Body:**
+
+```json
+{
+  "rating": 5,
+  "comment": "Looks exactly like the 3D model. Loved it!"
+}
+```
+
+| Field | Type | Required | Validation |
+|---|---|---|---|
+| rating | Integer | Yes | `1` to `5` |
+| comment | String | No | Max 1000 characters |
+
+> If the customer has already reviewed this product, the same row is **updated** (one review per customer, enforced by DB unique constraint `uq_review_product_customer`).
+
+**Success Response (200):**
+
+```json
+{
+  "success": true,
+  "message": "Review submitted successfully",
+  "data": {
+    "reviewId": 12,
+    "productId": 1,
+    "customerId": 7,
+    "customerName": "Roisul Islam",
+    "rating": 5,
+    "comment": "Looks exactly like the 3D model. Loved it!",
+    "createdAt": "2026-07-20T09:30:00",
+    "updatedAt": "2026-07-21T14:12:00",
+    "ownedByCurrentCustomer": true
+  },
+  "timestamp": "2026-07-27T11:00:00"
+}
+```
+
+---
+
+#### 11.4 Get My Review for a Product
+
+```
+GET /api/customer/products/{productId}/reviews/my
+```
+
+**Auth Required:** CUSTOMER
+
+Returns the caller's review for the product, or `404 Review not found` if they haven't reviewed it yet.
+
+---
+
+#### 11.5 Delete My Review
+
+```
+DELETE /api/customer/reviews/{reviewId}
+```
+
+**Auth Required:** CUSTOMER
+
+> Customers may only delete their own reviews. Attempting to delete another user's review returns `403 Unauthorized`.
+
+**Success Response (200):**
+
+```json
+{
+  "success": true,
+  "message": "Review deleted successfully",
+  "data": null,
+  "timestamp": "2026-07-27T11:00:00"
+}
+```
+
+---
+
+#### Review System Notes
+
+- **One review per customer per product** — enforced by the DB unique key `(product_id, customer_id)`. Calls to `POST /api/customer/products/{id}/reviews` from the same customer are upserts.
+- **Public visibility** — anyone (logged in or not) can read reviews and rating summaries.
+- **Aggregates are server-computed** — `averageRating` and the rating `distribution` are computed via JPA queries, not stored, so they always reflect the latest state.
+- **Ownership flag** — the `ownedByCurrentCustomer` field in `ReviewResponse` lets the frontend show "Edit / Delete" controls only on the caller's own reviews without a second round-trip.
