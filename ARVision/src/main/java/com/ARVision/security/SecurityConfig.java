@@ -44,7 +44,8 @@ public class SecurityConfig {
                                 "/api/auth/login",
                                 "/api/auth/refresh",
                                 "/api/products/**",
-                                "/api/payments/webhook"
+                                "/api/payments/webhook",
+                                "/api/chatbot/**"
                         ).permitAll()
                         // Exact-match POST only — Spring Security 6 prefix-matches bare paths,
                         // so "/api/auth/admin/create/kkkk" would otherwise wrongly require SUPER_ADMIN

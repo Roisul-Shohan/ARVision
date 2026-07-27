@@ -41,6 +41,7 @@ ARVision.zip
 .env.local
 application-local.properties
 application-local.yml
+src/main/resources/application.properties
 
 # ── Puku / AI editor caches ──────────────────────────────────────
 .puku/

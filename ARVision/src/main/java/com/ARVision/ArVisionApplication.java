@@ -7,6 +7,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 import org.springframework.boot.web.embedded.tomcat.TomcatServletWebServerFactory;
 import org.springframework.boot.web.server.WebServerFactoryCustomizer;
 import org.springframework.boot.web.servlet.ServletRegistrationBean;
@@ -15,6 +16,7 @@ import org.springframework.core.env.Environment;
 import org.springframework.web.servlet.DispatcherServlet;
 
 @SpringBootApplication
+@ConfigurationPropertiesScan
 public class ArVisionApplication {
 
     private static final Logger log = LoggerFactory.getLogger(ArVisionApplication.class);

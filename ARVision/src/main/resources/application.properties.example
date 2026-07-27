@@ -1,5 +1,12 @@
 spring.application.name=ARVision
 
+# ── Gemini chatbot ────────────────────────────────────────────
+# Get your key from https://aistudio.google.com/apikey
+gemini.api.key=YOUR_GEMINI_API_KEY
+gemini.api.model=gemini-1.5-flash
+gemini.api.url=https://generativelanguage.googleapis.com/v1beta
+gemini.api.timeout-ms=15000
+
 spring.datasource.url=jdbc:postgresql://YOUR_NEON_HOST/neondb?sslmode=require&channel_binding=disable
 spring.datasource.username=YOUR_USERNAME
 spring.datasource.password=YOUR_PASSWORD
