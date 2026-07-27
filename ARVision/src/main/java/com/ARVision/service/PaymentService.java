@@ -14,6 +14,7 @@ import com.ARVision.repository.CustomerRepository;
 import com.ARVision.repository.OrderRepository;
 import com.ARVision.repository.PaymentRepository;
 import com.google.gson.Gson;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.stripe.exception.InvalidRequestException;
 import com.stripe.exception.SignatureVerificationException;
@@ -156,15 +157,35 @@ private Customer getCustomer(String email) {
         public void handleWebhook(String payload, String sigHeader) {
                 Gson gson = new Gson();
 
+                // Helpful breadcrumb in Render logs
+                System.out.println("=== WEBHOOK RECEIVED ===");
+                System.out.println("verifyWebhook=" + verifyWebhook
+                                + " hasSignature=" + (sigHeader != null && !sigHeader.isBlank()));
+                System.out.println("payload(first 300)=" +
+                                (payload == null ? "<null>" : payload.substring(0, Math.min(300, payload.length()))));
+
                 try {
                         if (verifyWebhook && sigHeader != null && !sigHeader.isBlank()) {
                                 Event event = com.stripe.net.Webhook.constructEvent(
                                                 payload, sigHeader, webhookSecret);
                                 handleVerifiedWebhook(event);
                         } else {
+                                if (payload == null || payload.isBlank()) {
+                                        throw new RuntimeException("Empty webhook payload");
+                                }
                                 JsonObject root = gson.fromJson(payload, JsonObject.class);
-                                String type = root.get("type").getAsString();
-                                JsonObject object = root.getAsJsonObject("data").getAsJsonObject("object");
+                                if (root == null) {
+                                        throw new RuntimeException("Payload is not a JSON object");
+                                }
+                                JsonElement typeEl = root.get("type");
+                                if (typeEl == null || typeEl.isJsonNull()) {
+                                        throw new RuntimeException("Missing 'type' field in webhook payload");
+                                }
+                                String type = typeEl.getAsString();
+                                JsonObject data = root.has("data") ? root.getAsJsonObject("data") : null;
+                                JsonObject object = (data != null && data.has("object"))
+                                                ? data.getAsJsonObject("object")
+                                                : null;
                                 handleSimulatedWebhook(type, object, gson);
                         }
                 } catch (SignatureVerificationException e) {
@@ -203,9 +224,18 @@ private Customer getCustomer(String email) {
         private void handleSimulatedWebhook(String type, JsonObject object, Gson gson) {
                 System.out.println("=== SIMULATED WEBHOOK EVENT: " + type + " ===");
 
+                if (object == null) {
+                        System.out.println("Webhook payload missing 'data.object' — skipping.");
+                        return;
+                }
+
                 switch (type) {
                         case "payment_intent.succeeded" -> {
-                                String paymentIntentId = object.get("id").getAsString();
+                                JsonElement idEl = object.get("id");
+                                if (idEl == null || idEl.isJsonNull()) {
+                                        throw new RuntimeException("Missing 'id' on payment_intent object");
+                                }
+                                String paymentIntentId = idEl.getAsString();
                                 String latestChargeId = object.has("latest_charge") && !object.get("latest_charge").isJsonNull()
                                         ? object.get("latest_charge").getAsString()
                                         : null;
@@ -214,7 +244,11 @@ private Customer getCustomer(String email) {
                                 handlePaymentSuccess(paymentIntentId, latestChargeId);
                         }
                         case "payment_intent.payment_failed" -> {
-                                String paymentIntentId = object.get("id").getAsString();
+                                JsonElement idEl = object.get("id");
+                                if (idEl == null || idEl.isJsonNull()) {
+                                        throw new RuntimeException("Missing 'id' on payment_intent object");
+                                }
+                                String paymentIntentId = idEl.getAsString();
                                 System.out.println("Payment failed: " + paymentIntentId);
                                 handlePaymentFailure(paymentIntentId);
                         }
